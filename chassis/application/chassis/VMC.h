@@ -4,7 +4,8 @@
 #include "chassis.h"
 #include "balance.h"
 
-void VMC_Calc(control_data *control_datas,leg_motor_torque *leg_motor_torques,leg_Resolve *leg);
+void VMC_Calc(r_control_data *control_datas,r_leg_motor_torque *leg_motor_torques,r_leg_Resolve *leg);
+void l_VMC_Calc(l_control_data *control_datas,l_leg_motor_torque *leg_motor_torques,l_leg_Resolve *leg);
 
 
 #endif

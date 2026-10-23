@@ -163,7 +163,7 @@ void DMMotorTask(void const *argument)
         motor_send_mailbox.position_des = float_to_uint(target_pos, DM_P_MIN, DM_P_MAX, 16);
         motor_send_mailbox.velocity_des = float_to_uint(0.0f, DM_V_MIN, DM_V_MAX, 12);
         motor_send_mailbox.torque_des   = float_to_uint(0.0f, DM_T_MIN, DM_T_MAX, 12); // 前馈力矩=0
-        motor_send_mailbox.Kp = 180.0f;   // 位置刚度
+        motor_send_mailbox.Kp = 560.0f;   // 位置刚度
         motor_send_mailbox.Kd = 4.0f;    // 阻尼，别写0
 
         if (motor->stop_flag == MOTOR_STOP)

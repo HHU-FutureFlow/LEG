@@ -13,24 +13,46 @@
 #include "LQR.h"
 #include "controller.h"
 #include "VMC.h"
+#include <math.h>
 
 
-static DMMotorInstance *front_8009_motor,*behind_8009_motor;
-static DJIMotorInstance *motor_left, *motor_right;
-static PIDInstance leg_length_pid;
+static DMMotorInstance *r_front_8009_motor,*r_behind_8009_motor;
+static DMMotorInstance *l_front_8009_motor, *l_behind_8009_motor;
+static DJIMotorInstance *l_wheel_motor, *r_wheel_motor;
+static PIDInstance l_leg_length_pid;
+static PIDInstance r_leg_length_pid;
+
+static PIDInstance l_theta_pid;
+static PIDInstance r_theta_pid;
+
 attitude_t *chassis_IMU_data;
-leg_Resolve leg;
-Wheel_data wheel;
-balance_observation balance_observe;
-balance_target targets;
-control_data control_datas;
-leg_motor_torque leg_motor_torques;
+r_leg_Resolve r_leg;
+r_Wheel_data r_wheel;
+r_balance_observation r_balance_observe;
+r_balance_target r_targets;
+r_control_data r_control_datas;
+r_leg_motor_torque r_leg_motor_torques;
+
+l_leg_Resolve l_leg;
+l_Wheel_data l_wheel;
+l_balance_observation l_balance_observe;
+l_balance_target l_targets;
+l_control_data l_control_datas;
+l_leg_motor_torque l_leg_motor_torques;
+/* Set raw joint angles measured at the mirrored right calibration pose.
+ * Raw reference on right: front = rear = 0.357252 rad.
+ * RAM only; set l_zero_ready=1 after filling both offsets.
+ */
+volatile float l_front_zero = 0.0f, l_behind_zero = 0.0f;
+volatile float l_front_raw_position, l_behind_raw_position;
+
+volatile float l_wheel_direction = -1.0f;
 
 void ChassisInit()
 {
     chassis_IMU_data = INS_Init();
 
-    Motor_Init_Config_s config = {
+    Motor_Init_Config_s r_config = {
         .can_init_config = {
             .can_handle = &hcan1,            
         },
@@ -39,19 +61,35 @@ void ChassisInit()
         },
     };
 
-    config.can_init_config.tx_id = 2;
-    config.can_init_config.rx_id = 2;
-    front_8009_motor = DMMotorInit(&config);
+    r_config.can_init_config.tx_id = 2;
+    r_config.can_init_config.rx_id = 2;
+    r_front_8009_motor = DMMotorInit(&r_config);
 
-    config.can_init_config.tx_id = 3;
-    config.can_init_config.rx_id = 3;
-    behind_8009_motor = DMMotorInit(&config);
+    r_config.can_init_config.tx_id = 3;
+    r_config.can_init_config.rx_id = 3;
+    r_behind_8009_motor = DMMotorInit(&r_config);
 
+    Motor_Init_Config_s l_config =
+    {
+        .can_init_config = {
+            .can_handle = &hcan1
+        },
+        .controller_setting_init_config = {
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL
+        },
+    };
 
+    l_config.can_init_config.tx_id = 5;
+    l_config.can_init_config.rx_id = 5;
+    l_front_8009_motor = DMMotorInit(&l_config);
+
+    l_config.can_init_config.tx_id = 4;
+    l_config.can_init_config.rx_id = 4;
+    l_behind_8009_motor = DMMotorInit(&l_config);
 
 
     Motor_Init_Config_s chassis_motor_config = {
-        .can_init_config.can_handle = &hcan1,
+        .can_init_config.can_handle = &hcan2,
         .controller_param_init_config = {
             .current_PID = {
                 .Kp = 5.0f,
@@ -77,22 +115,22 @@ void ChassisInit()
     chassis_motor_config.can_init_config.tx_id = 1;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
 
-    motor_left = PowerControlInit(&chassis_motor_config);
+    l_wheel_motor = PowerControlInit(&chassis_motor_config);
 
 
 
     chassis_motor_config.can_init_config.tx_id = 2;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
 
-    motor_right = PowerControlInit(&chassis_motor_config);
+    r_wheel_motor = PowerControlInit(&chassis_motor_config);
 
 
 
 
-    static PID_Init_Config_s leg_length_pid_config = 
+    static PID_Init_Config_s r_leg_length_pid_config = 
 
     {
-        .Kp = 60.0f,  
+        .Kp = 90.0f,  
         .Ki = 0.0f,
         .Kd = 0.0f,
         .MaxOut = 9000.0f,
@@ -102,65 +140,115 @@ void ChassisInit()
     };
 
 
-    PIDInit(&leg_length_pid, &leg_length_pid_config);
+    PIDInit(&r_leg_length_pid, &r_leg_length_pid_config);
+    PID_Init_Config_s l_leg_length_pid_config = r_leg_length_pid_config;
+    PIDInit(&l_leg_length_pid, &l_leg_length_pid_config);
+
 
 
     
+
+    
+
 }
 
 
 
 void ChassisTask()
 {
-    
-    // DMMotorSetMode(DM_CMD_MOTOR_MODE, front_8009_motor);
-    // DMMotorSetMode(DM_CMD_MOTOR_MODE, behind_8009_motor);
+    DMMotorSetMode(DM_CMD_MOTOR_MODE, l_front_8009_motor);
+    DMMotorSetMode(DM_CMD_MOTOR_MODE, l_behind_8009_motor);
     SetPowerLimit(1000000.0f);
-    float theta_f=front_8009_motor->measure.position;
-    float theta_b=behind_8009_motor->measure.position;
-    float speed_f=front_8009_motor->measure.velocity;
-    float speed_b=behind_8009_motor->measure.velocity;
-    float wheel_angle=motor_left->measure.total_angle;
-    float wheel_w=motor_left->measure.speed_aps;
+    float r_theta_f=r_front_8009_motor->measure.position;
+    float r_theta_b=r_behind_8009_motor->measure.position;
+    float r_speed_f=r_front_8009_motor->measure.velocity;
+    float r_speed_b=r_behind_8009_motor->measure.velocity;
+    float r_wheel_angle=r_wheel_motor->measure.total_angle;
+    float r_wheel_w=r_wheel_motor->measure.speed_aps;
+
+    r_targets.r_theta_t_target=0.000f;
+    r_targets.r_dtheta_target=0;
+    r_targets.r_x_target=0;
+    r_targets.r_dx_target=0;
+    r_targets.r_phi_target=0;
+    r_targets.r_dphi_target=0;
+    r_targets.r_leg_length_target = 0.4f;
+
+    r_Alpha_beta_calculate(r_theta_f,r_theta_b,r_speed_f,r_speed_b,&r_leg);
+    r_wheel_control(r_wheel_angle,r_wheel_w,&r_wheel);
+    r_BalanceObserve(&r_balance_observe);
+    LQR_calc(&r_balance_observe,&r_targets,&r_control_datas);
+    r_control_datas.r_Tleg= PIDCalculate(&r_leg_length_pid,r_balance_observe.r_leg_length,r_targets.r_leg_length_target);
+    VMC_Calc(&r_control_datas,&r_leg_motor_torques,&r_leg);
+   
 
 
-    targets.theta_t_target=0;
-    targets.dtheta_target=0;
-    targets.x_target=0;
-    targets.dx_target=0;
-    targets.phi_target=0;
-    targets.dphi_target=0;
-    targets.leg_length_target = 0.40482f;
+    
+
+    // DMMotorSetRef(r_front_8009_motor,0.01f );
+    // DMMotorSetRef(r_behind_8009_motor,0.01f);
+    // DJIMotorSetRef(r_wheel_motor,3318.833*r_control_datas.r_Tw);
+
+    float l_theta_f= -l_front_8009_motor->measure.position;
+    float l_theta_b=-l_behind_8009_motor->measure.position;
+    float l_speed_f=-l_front_8009_motor->measure.velocity;
+    float l_speed_b=-l_behind_8009_motor->measure.velocity;
+    float l_wheel_angle= -l_wheel_motor->measure.total_angle;
+    float l_wheel_w= -l_wheel_motor->measure.speed_aps;
 
 
-    Alpha_beta_calculate(theta_f,theta_b,speed_f,speed_b,&leg);
-    wheel_control(wheel_angle,wheel_w,&wheel);
-    BalanceObserve(&balance_observe);
-    LQR_calc(&balance_observe,&targets,&control_datas);
-    control_datas.Tleg= PIDCalculate(&leg_length_pid,balance_observe.leg_length,targets.leg_length_target);
-    VMC_Calc(&control_datas,&leg_motor_torques,&leg);
-
-    // DMMotorSetRef(front_8009_motor,leg_motor_torques.Tf );
-    // DMMotorSetRef(behind_8009_motor,leg_motor_torques.Tb );
+    l_targets.l_theta_t_target=-0.000f;
+    l_targets.l_dtheta_target=0;
+    l_targets.l_x_target=0;
+    l_targets.l_dx_target=0;
+    l_targets.l_phi_target=0;
+    l_targets.l_dphi_target=0;
+    l_targets.l_leg_length_target = 0.4f;
 
 
+    l_Alpha_beta_calculate(l_theta_f,l_theta_b,l_speed_f,l_speed_b,&l_leg);
+    l_wheel_control(l_wheel_angle,l_wheel_w,&l_wheel);
+    l_BalanceObserve(&l_balance_observe);
+    l_LQR_calc(&l_balance_observe,&l_targets,&l_control_datas);
+    l_control_datas.l_Tleg = PIDCalculate(&l_leg_length_pid, l_balance_observe.l_leg_length,l_targets.l_leg_length_target);
+    l_VMC_Calc(&l_control_datas,&l_leg_motor_torques,&l_leg);
+    
+    
+    /* Mirror torque as well as position; driver direction remains NORMAL. */
+    // DMMotorSetRef(l_front_8009_motor,
+    //     isfinite(l_leg_motor_torques.l_Tf) ? -l_leg_motor_torques.l_Tf : 0.0f);
+    // DMMotorSetRef(l_behind_8009_motor,
+    //     isfinite(l_leg_motor_torques.l_Tb) ? -l_leg_motor_torques.l_Tb : 0.0f);
+    // DJIMotorSetRef(l_wheel_motor,l_wheel_direction*3318.833*l_control_datas.l_Tw);
 
-    //  DMMotorSetRef(front_8009_motor,0.01f );
-    //  DMMotorSetRef(behind_8009_motor,0.01f);
 
 
-    DJIMotorSetRef( motor_right ,3318.833*control_datas.Tw);
+    DMMotorSetCtrlMode(r_front_8009_motor,  DM_CTRL_POSITION);
+    DMMotorSetCtrlMode(r_behind_8009_motor, DM_CTRL_POSITION);
+    DMMotorSetCtrlMode(l_front_8009_motor,  DM_CTRL_POSITION);
+    DMMotorSetCtrlMode(l_behind_8009_motor, DM_CTRL_POSITION);
+
+
+    DMMotorSetRef(r_front_8009_motor,  -0.722491f);
+    DMMotorSetRef(r_behind_8009_motor, -0.072904f);
+    DMMotorSetRef(l_front_8009_motor,   -2.603873f);
+    DMMotorSetRef(l_behind_8009_motor,  2.278726f);
+
+    // DMMotorSetRef(r_front_8009_motor,r_leg_motor_torques.r_Tf );
 
 
 
+    // DMMotorSetRef(r_front_8009_motor,r_leg_motor_torques.r_Tf );
+    // DMMotorSetRef(r_behind_8009_motor,r_leg_motor_torques.r_Tb );
+    // DMMotorSetRef(l_front_8009_motor,l_leg_motor_torques.l_Tf );
+    // DMMotorSetRef(l_behind_8009_motor,l_leg_motor_torques.l_Tb );
 
-    DMMotorSetCtrlMode(front_8009_motor, DM_CTRL_POSITION); 
-    DMMotorSetRef(front_8009_motor, -0.6735f);
-    DMMotorSetCtrlMode(behind_8009_motor, DM_CTRL_POSITION); 
-    DMMotorSetRef(behind_8009_motor, -0.04177f);
+    DJIMotorSetRef(r_wheel_motor,3318.833*r_control_datas.r_Tw);
+    DJIMotorSetRef(l_wheel_motor,l_wheel_direction*3318.833*l_control_datas.l_Tw);
 
+
+    
 
 
 
 }
-

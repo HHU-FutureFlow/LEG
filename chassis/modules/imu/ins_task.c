@@ -88,7 +88,7 @@ attitude_t *INS_Init(void)
 
     while (BMI088Init(&hspi1, 1) != BMI088_NO_ERROR)
         ;
-    IMU_Param.scale[X] = -1;
+    IMU_Param.scale[X] = 1;
     IMU_Param.scale[Y] = 1;
     IMU_Param.scale[Z] = 1;
     IMU_Param.Yaw = 0;

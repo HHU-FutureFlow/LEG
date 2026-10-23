@@ -1,5 +1,5 @@
-#ifndef _BALANCE_H
-#define _BALANCE_H
+#ifndef BALANCE_H
+#define BALANCE_H
 #pragma once
 
 
@@ -10,83 +10,208 @@
 //α= 大腿电机编码器值 - 0.357252  单位为rad
 
 
-#define LEG_A (0.21f)
-#define LEG_B (0.25f)
-#define HALF_WHEEL_BASE (0.06f)
-#define REDUCTION_RATIO (15.8f)
+#define R_LEG_A (0.21f)
+#define R_LEG_B (0.25f)
+#define R_HALF_WHEEL_BASE (0.06f)
+#define R_REDUCTION_RATIO (15.8f)
+
+// typedef struct
+// {
+//     //LQR用
+//     float r_theta;//该腿摆杆相对竖直倾⻆
+//     float r_dtheta;//该腿摆杆⻆速度
+//     float r_x;//该腿轮⼦⽔平位移
+//     float r_dx;//该腿轮⼦⽔平速度
+//     float r_phi;//机体俯仰⻆
+//     float r_dphi;//机体俯仰⻆速度
+
+
+
+//     //PID用
+//     float r_leg_length;//该腿摆杆长度
+
+
+// } r_balance_observation; //需要观测的状态//6维度
+
+// typedef struct
+// {
+//     //LQR用
+
+//     float s;//⽔平位移
+//     float ds;//     ⽔平速度
+
+//     float yaw;//机体偏航⻆
+//     float dyaw;//机体偏航⻆速度
+
+//     float l_theta;//该腿摆杆相对竖直倾⻆
+//     float l_dtheta;//该腿摆杆⻆速度
+
+//     float r_theta;//该腿摆杆相对竖直倾⻆
+//     float r_dtheta;//该腿摆杆⻆速度
+
+//     float phi;//机体俯仰⻆
+//     float dphi;//机体俯仰⻆速度
+
+
+
+//     //PID用
+//     float r_leg_length;//该腿摆杆长度
+//     float l_leg_length;
+
+
+// } ten_balance_observation; //需要观测的状态
 
 typedef struct
 {
     //LQR用
-    float theta;//该腿摆杆相对竖直倾⻆
-    float dtheta;//该腿摆杆⻆速度
-    float x;//该腿轮⼦⽔平位移
-    float dx;//该腿轮⼦⽔平速度
-    float phi;//机体俯仰⻆
-    float dphi;//机体俯仰⻆速度
+    float r_theta;//该腿摆杆相对竖直倾⻆
+    float r_dtheta;//该腿摆杆⻆速度
+    float r_x;//该腿轮⼦⽔平位移
+    float r_dx;//该腿轮⼦⽔平速度
+    float r_phi;//机体俯仰⻆
+    float r_dphi;//机体俯仰⻆速度
 
 
 
     //PID用
-    float leg_length;//该腿摆杆长度
+    float r_leg_length;//该腿摆杆长度
 
 
-} balance_observation; //需要观测的状态
+} r_balance_observation; //需要观测的状态
+
+typedef struct {
+   //LQR用
+    float r_theta_t_target;//该腿摆杆相对竖直倾⻆目标值
+    float r_dtheta_target;//该腿摆杆⻆速度
+    float r_x_target;//该腿轮⼦⽔平位移
+    float r_dx_target;//该腿轮⼦⽔平速度
+    float r_phi_target;//机体俯仰⻆
+    float r_dphi_target;//机体俯仰⻆速度
+
+
+    //PID用
+    float r_leg_length_target;//该腿摆杆长度
+} r_balance_target; //目标值
+
+typedef struct
+{
+    float r_alpha;
+    float r_beta;
+    float r_dalpha;
+    float r_dbeta;
+
+} r_leg_Resolve;//解算要用的变量
+
+typedef struct {
+    float r_x;
+    float r_dx;
+} r_Wheel_data; 
+
+typedef struct {
+    float r_x;
+    float r_z;
+} r_Point2D; //二维坐标系
+
+
+typedef struct 
+{
+    float r_Tw;
+    float r_Tp;
+    float r_Tleg;
+} r_control_data; //LQR的控制向量和PID输出力矩
+
+typedef struct {
+    float r_Tf;
+    float r_Tb;
+} r_leg_motor_torque; //腿部电机力矩
+
+
+
+
+
+float r_leg_theta_calculate(r_leg_Resolve *r_leg,int r_L,int r_theta);
+void r_BalanceObserve(r_balance_observation *r_observe);
+void  r_Alpha_beta_calculate(float r_motor_big_leg,float r_motor_small_leg,float r_motor_big_speed,float r_motor_small_speed,r_leg_Resolve *r_leg);
+float r_leg_theta_rate_calculate(r_leg_Resolve *r_leg);
+void r_wheel_control(float r_wheel_angle,float r_wheel_w,r_Wheel_data *r_wheel);
+
+#define L_LEG_A (0.21f)
+#define L_LEG_B (0.25f)
+#define L_HALF_WHEEL_BASE (0.06f)
+#define L_REDUCTION_RATIO (15.8f)
+
+typedef struct
+{
+    //LQR用
+    float l_theta;//该腿摆杆相对竖直倾⻆
+    float l_dtheta;//该腿摆杆⻆速度
+    float l_x;//该腿轮⼦⽔平位移
+    float l_dx;//该腿轮⼦⽔平速度
+    float l_phi;//机体俯仰⻆
+    float l_dphi;//机体俯仰⻆速度
+
+
+
+    //PID用
+    float l_leg_length;//该腿摆杆长度
+
+
+} l_balance_observation; //需要观测的状态
 
 
 typedef struct
 {
-    float alpha;
-    float beta;
-    float dalpha;
-    float dbeta;
+    float l_alpha;
+    float l_beta;
+    float l_dalpha;
+    float l_dbeta;
 
-} leg_Resolve;//解算要用的变量
-
-typedef struct {
-    float x;
-    float dx;
-} Wheel_data; 
+} l_leg_Resolve;//解算要用的变量
 
 typedef struct {
-    float x;
-    float z;
-} Point2D; //二维坐标系
+    float l_x;
+    float l_dx;
+} l_Wheel_data; 
+
+typedef struct {
+    float l_x;
+    float l_z;
+} l_Point2D; //二维坐标系
 
 typedef struct {
    //LQR用
-    float theta_t_target;//该腿摆杆相对竖直倾⻆目标值
-    float dtheta_target;//该腿摆杆⻆速度
-    float x_target;//该腿轮⼦⽔平位移
-    float dx_target;//该腿轮⼦⽔平速度
-    float phi_target;//机体俯仰⻆
-    float dphi_target;//机体俯仰⻆速度
+    float l_theta_t_target;//该腿摆杆相对竖直倾⻆目标值
+    float l_dtheta_target;//该腿摆杆⻆速度
+    float l_x_target;//该腿轮⼦⽔平位移
+    float l_dx_target;//该腿轮⼦⽔平速度
+    float l_phi_target;//机体俯仰⻆
+    float l_dphi_target;//机体俯仰⻆速度
 
 
     //PID用
-    float leg_length_target;//该腿摆杆长度
-} balance_target; //目标值
+    float l_leg_length_target;//该腿摆杆长度
+} l_balance_target; //目标值
 
 typedef struct 
 {
-    float Tw;
-    float Tp;
-    float Tleg;
-} control_data; //LQR的控制向量和PID输出力矩
+    float l_Tw;
+    float l_Tp;
+    float l_Tleg;
+} l_control_data; //LQR的控制向量和PID输出力矩
 
 typedef struct {
-    float Tf;
-    float Tb;
-} leg_motor_torque; //腿部电机力矩
+    float l_Tf;
+    float l_Tb;
+} l_leg_motor_torque; //腿部电机力矩
 
 
 
 
 
-float leg_theta_calculate(leg_Resolve *leg,int L,int theta);
-void BalanceObserve(balance_observation *observe);
-void  Alpha_beta_calculate(float motor_big_leg,float motor_small_leg,float motor_big_speed,float motor_small_speed,leg_Resolve *leg);
-float leg_theta_rate_calculate(leg_Resolve *leg);
-void wheel_control(float wheel_angle,float wheel_w,Wheel_data *wheel);
+float l_leg_theta_calculate(l_leg_Resolve *l_leg,int l_L,int l_theta);
+void l_BalanceObserve(l_balance_observation *l_observe);
+void  l_Alpha_beta_calculate(float l_motor_big_leg,float l_motor_small_leg,float l_motor_big_speed,float l_motor_small_speed,l_leg_Resolve *l_leg);
+float l_leg_theta_rate_calculate(l_leg_Resolve *l_leg);
+void l_wheel_control(float l_wheel_angle,float l_wheel_w,l_Wheel_data *l_wheel);
 
 #endif 
