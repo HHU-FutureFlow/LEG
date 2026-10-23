@@ -55,3 +55,9 @@ build
 
 tools/
 .vscode/
+
+# Local tool installations and generated workspace files
+/tool/
+/.tools/
+/compile_commands.json
+/debug.log
