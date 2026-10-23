@@ -12,10 +12,8 @@
 #define DM_P_MAX  12.5f
 #define DM_V_MIN  (-45.0f)
 #define DM_V_MAX  45.0f
-#define DM_T_MIN  (-0.2f)
-#define DM_T_MAX   0.2f
-// #define DM_T_MIN  (-54.0f)
-// #define DM_T_MAX   54.0f
+#define DM_T_MIN  (-54.0f)
+#define DM_T_MAX   54.0f
 
 typedef struct 
 {
@@ -38,6 +36,16 @@ typedef struct
     uint16_t Kp;
     uint16_t Kd;
 }DMMotor_Send_s;
+
+
+
+
+typedef enum 
+{
+    DM_CTRL_TORQUE = 0,   // 纯力矩
+    DM_CTRL_POSITION,     // 位置保持（MIT阻抗位置）
+} DMMotorCtrlMode_e;
+
 typedef struct 
 {
     DM_Motor_Measure_s measure;
@@ -54,6 +62,7 @@ typedef struct
     CANInstance *motor_can_instace;
     DaemonInstance* motor_daemon;
     uint32_t lost_cnt;
+    DMMotorCtrlMode_e ctrl_mode;
 }DMMotorInstance;
 
 typedef enum
@@ -63,6 +72,16 @@ typedef enum
     DM_CMD_ZERO_POSITION = 0xfe, // 将当前的位置设置为编码器零位
     DM_CMD_CLEAR_ERROR = 0xfb // 清除电机过热错误
 }DMMotor_Mode_e;
+
+
+
+
+
+
+
+
+
+
 
 DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config);
 
@@ -76,4 +95,5 @@ void DMMotorStop(DMMotorInstance *motor);
 void DMMotorCaliEncoder(DMMotorInstance *motor);
 void DMMotorControlInit();
 void DMMotorSetMode(DMMotor_Mode_e cmd, DMMotorInstance *motor);
+void DMMotorSetCtrlMode(DMMotorInstance *motor, DMMotorCtrlMode_e mode);
 #endif // !DMMOTOR

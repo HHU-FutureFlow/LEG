@@ -115,7 +115,10 @@ void DMMotorOuterLoop(DMMotorInstance *motor, Closeloop_Type_e type)
 {
     motor->motor_settings.outer_loop_type = type;
 }
-
+void DMMotorSetCtrlMode(DMMotorInstance *motor, DMMotorCtrlMode_e mode)
+{
+    motor->ctrl_mode = mode;
+}
 
 //@Todo: 目前只实现了力控，更多位控PID等请自行添加
 void DMMotorTask(void const *argument)
@@ -134,6 +137,10 @@ void DMMotorTask(void const *argument)
         set = pid_ref;
         if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
             set *= -1;
+
+
+        if (motor->ctrl_mode == DM_CTRL_TORQUE)
+    {    
        
         LIMIT_MIN_MAX(set, DM_T_MIN, DM_T_MAX);
         motor_send_mailbox.position_des = float_to_uint(0, DM_P_MIN, DM_P_MAX, 16);
@@ -144,6 +151,31 @@ void DMMotorTask(void const *argument)
 
         if(motor->stop_flag == MOTOR_STOP)
             motor_send_mailbox.torque_des = float_to_uint(0, DM_T_MIN, DM_T_MAX, 12);
+    }
+
+    else  // DM_CTRL_POSITION
+    {
+        // ===== 位置保持模式 =====
+        // pid_ref 此时语义是：目标位置（弧度）
+        float target_pos = set;
+        LIMIT_MIN_MAX(target_pos, DM_P_MIN, DM_P_MAX);
+
+        motor_send_mailbox.position_des = float_to_uint(target_pos, DM_P_MIN, DM_P_MAX, 16);
+        motor_send_mailbox.velocity_des = float_to_uint(0.0f, DM_V_MIN, DM_V_MAX, 12);
+        motor_send_mailbox.torque_des   = float_to_uint(0.0f, DM_T_MIN, DM_T_MAX, 12); // 前馈力矩=0
+        motor_send_mailbox.Kp = 180.0f;   // 位置刚度
+        motor_send_mailbox.Kd = 4.0f;    // 阻尼，别写0
+
+        if (motor->stop_flag == MOTOR_STOP)
+        {
+            // 急停：力矩清零，Kp/Kd也清，电机无力
+            motor_send_mailbox.torque_des = float_to_uint(0, DM_T_MIN, DM_T_MAX, 12);
+            motor_send_mailbox.Kp = 0.0f;
+            motor_send_mailbox.Kd = 0.0f;
+        }
+    }
+
+
 
         motor->motor_can_instace->tx_buff[0] = (uint8_t)(motor_send_mailbox.position_des >> 8);
         motor->motor_can_instace->tx_buff[1] = (uint8_t)(motor_send_mailbox.position_des);

@@ -140,10 +140,8 @@ void ChassisTask()
     control_datas.Tleg= PIDCalculate(&leg_length_pid,balance_observe.leg_length,targets.leg_length_target);
     VMC_Calc(&control_datas,&leg_motor_torques,&leg);
 
-    DMMotorSetRef(front_8009_motor,leg_motor_torques.Tf );
-    DMMotorSetRef(behind_8009_motor,leg_motor_torques.Tb );
-
-
+    // DMMotorSetRef(front_8009_motor,leg_motor_torques.Tf );
+    // DMMotorSetRef(behind_8009_motor,leg_motor_torques.Tb );
 
 
 
@@ -151,7 +149,17 @@ void ChassisTask()
     //  DMMotorSetRef(behind_8009_motor,0.01f);
 
 
-    // DJIMotorSetRef(motor_left,3318.833*control_datas.Tw);
+    DJIMotorSetRef( motor_right ,3318.833*control_datas.Tw);
+
+
+
+
+    DMMotorSetCtrlMode(front_8009_motor, DM_CTRL_POSITION); 
+    DMMotorSetRef(front_8009_motor, -0.6735f);
+    DMMotorSetCtrlMode(behind_8009_motor, DM_CTRL_POSITION); 
+    DMMotorSetRef(behind_8009_motor, -0.04177f);
+
+
 
 
 }
