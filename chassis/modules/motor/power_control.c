@@ -316,19 +316,63 @@ void PowerControl()
         }
     }
 
-    for (uint8_t i = 0; i < idx; i++)
-    {
-        motor = dji_motor_instance[i];
-        set = (int16_t)power_control_out[i];
-        group = motor->sender_group;
-        num = motor->message_num;
-        sender_assignment[group].tx_buff[2 * num] = (uint8_t)(set >> 8);         // 低八位
-        sender_assignment[group].tx_buff[2 * num + 1] = (uint8_t)(set & 0x00ff); // 高八位
+    // for (uint8_t i = 0; i < idx; i++)
+    // {
+    //     motor = dji_motor_instance[i];
+    //     set = (int16_t)power_control_out[i];
+    //     group = motor->sender_group;
+    //     num = motor->message_num;
+    //     sender_assignment[group].tx_buff[2 * num] = (uint8_t)(set >> 8);         // 低八位
+    //     sender_assignment[group].tx_buff[2 * num + 1] = (uint8_t)(set & 0x00ff); // 高八位
 
-        // 若该电机处于停止状态,直接将buff置零
-        if (motor->stop_flag == MOTOR_STOP)
-            memset(sender_assignment[group].tx_buff + 2 * num, 0, sizeof(uint16_t));
+    //     // 若该电机处于停止状态,直接将buff置零
+    //     if (motor->stop_flag == MOTOR_STOP)
+    //         memset(sender_assignment[group].tx_buff + 2 * num, 0, sizeof(uint16_t));
+    // }
+    for (uint8_t i = 0; i < idx; i++)
+{
+    motor = dji_motor_instance[i];
+
+    /* 最终发送保护：所有控制路径都必须经过这里。 */
+    float current_cmd = power_control_out[i];
+
+    /* NaN、正无穷、负无穷均按零电流处理。 */
+    if (!isfinite(current_cmd))
+    {
+        current_cmd = 0.0f;
     }
+
+    /* 沿用工程当前的电流命令限值。 */
+    if (current_cmd > 15000.0f)
+    {
+        current_cmd = 15000.0f;
+    }
+    else if (current_cmd < -15000.0f)
+    {
+        current_cmd = -15000.0f;
+    }
+
+    /* 保存限幅结果，便于通过 EmberProbe 观察。 */
+    power_control_out[i] = current_cmd;
+
+    /* 到这里数值已有限且在范围内，可以安全转换。 */
+    set = (int16_t)current_cmd;
+
+    group = motor->sender_group;
+    num = motor->message_num;
+
+    sender_assignment[group].tx_buff[2 * num] =
+        (uint8_t)(set >> 8);
+    sender_assignment[group].tx_buff[2 * num + 1] =
+        (uint8_t)(set & 0x00ff);
+
+    /* 电机停止时仍然发送零电流。 */
+    if (motor->stop_flag == MOTOR_STOP)
+    {
+        memset(sender_assignment[group].tx_buff + 2 * num,
+               0, sizeof(uint16_t));
+    }
+}
 
     // 遍历flag,检查是否要发送这一帧报文
     for (size_t i = 0; i < 6; ++i)

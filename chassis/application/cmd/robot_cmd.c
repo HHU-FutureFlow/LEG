@@ -398,3 +398,46 @@ void RobotCMDTask()
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
 }
+
+
+
+float RobotCMDGetForwardSpeed(void)
+{
+    const int deadband = 20;
+    const float max_speed = 0.15f;  // 初次调试最大速度：0.15 m/s
+    static uint8_t ready = 0;
+
+    /* 无有效遥控、未进入遥控档或命令层停止时，不接受行走指令 */
+    if (rc_data == NULL ||
+        !RemoteControlIsOnline() ||
+        !switch_is_down(rc_data[TEMP].rc.switch_left) ||
+        robot_state == ROBOT_STOP)
+    {
+        ready = 0;
+        return 0.0f;
+    }
+
+    int ch = rc_data[TEMP].rc.rocker_r1;
+
+    /* 首次进入/重新连接后，要求摇杆先回中 */
+    if (!ready)
+    {
+        if (ch >= -deadband && ch <= deadband)
+            ready = 1;
+
+        return 0.0f;
+    }
+
+    /* 限制到正常通道范围 */
+    if (ch > 660)  ch = 660;
+    if (ch < -660) ch = -660;
+
+    /* 死区外连续映射到 -max_speed ~ +max_speed */
+    if (ch > deadband)
+        return (float)(ch - deadband) / (660 - deadband) * max_speed;
+
+    if (ch < -deadband)
+        return (float)(ch + deadband) / (660 - deadband) * max_speed;
+
+    return 0.0f;
+}

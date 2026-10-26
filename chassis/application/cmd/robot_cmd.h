@@ -14,4 +14,6 @@ void RobotCMDInit();
  */
 void RobotCMDTask();
 
+/* 前后速度指令，单位 m/s */
+float RobotCMDGetForwardSpeed(void);
 #endif // !ROBOT_CMD_H

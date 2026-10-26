@@ -1,24 +1,31 @@
 #include "LQR.h"
 
 
-// float K[2][6]=
-// {
-//     {  16.3382  ,  1.1671  , 3.8455  , 1.6600  , 1.3472 ,  0.3284},
-//     {     0.9049  ,  0.0725  , -0.9217  , -0.2619  , 20.0598  ,  2.3618} 
-
-// };//大腿竖直，小腿最长
 
 
+//大腿竖直，小腿最长
+
+
+/* u = -K * (state - target).
+ * Columns: theta, dtheta, wheel x, wheel dx, phi, dphi.
+ * theta > 0: wheel axle ahead of hip; phi > 0: body leans backward.
+ * Rows: Tw drives the wheel forward; Tp swings the leg forward.
+ * Coupled acceleration model and checks: diagnostics/lqr-model-fixed/.
+ * Q = diag(150,1,50,1,200,1), R = diag(8,0.5).
+ * Wheel torque cost raised from 4 to 8; leg cost remains 0.5.
+ */
 float K[2][6]=
 {
-    {  16.3382  ,  1.1671  , 3.8455  , 1.6600 , 1.3472 ,  0.3284},
-    {     0  ,  0  , -0.9217  , -0.2619  , 0  ,  0}
+    {15.4139224f, 2.2647618f, -3.8390172f,-3.4509602f, 2.0319677f, 0.2912004f},
 
-};//大腿竖直，小腿最长
+    {9.4016085f, 1.5492440f, -3.1837933f,-2.6888755f, -26.0771750f, -2.2864935f}
+};
+
+
 
 // float K[4][10]=
 // {
-//     {  },
+//     {  }, 1.4104    0.0769   -1.7325   -0.2979   28.2688    2.4956
 //     {   },
 //     {   },
 //     {   }
@@ -47,7 +54,7 @@ void LQR_calc(r_balance_observation *observe,r_balance_target *balance_targets,r
     }
 
     control_datas->r_Tw=-u[0];
-    // control_datas->r_Tp=-u[1];
+    control_datas->r_Tp=-u[1];
 
 }
 
@@ -73,7 +80,7 @@ void l_LQR_calc(l_balance_observation *observe,l_balance_target *balance_targets
     }
 
     control_datas->l_Tw=-u[0];
-    // control_datas->l_Tp=-u[1];
+    control_datas->l_Tp=-u[1];
 
 }
 
